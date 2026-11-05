@@ -1,466 +1,471 @@
 <!DOCTYPE html>
-<html lang="id">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistem Informasi Perubahan Tutupan Lahan</title>
-    
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- Leaflet CSS -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
-    
-    <!-- Font Awesome -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-
-    <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-
-    <style>
-        body { font-family: 'Inter', sans-serif; }
+    <html lang="id">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Sistem Informasi Perubahan Tutupan Lahan</title>
         
-        /* Map Container needs to take full height minus header if any, here we use absolute positioning */
-        #map {
-            position: absolute;
-            top: 0;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            z-index: 1; /* Map at bottom */
-        }
-
-        /* UI Overlays need higher z-index */
-        .ui-overlay {
-            z-index: 1000;
-        }
-
-        /* Custom scrollbar for panels if they get too long */
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
-        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
-
-        /* Range Slider Styling */
-        input[type=range] {
-            -webkit-appearance: none;
-            width: 100%;
-            background: transparent;
-        }
-        input[type=range]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            height: 20px;
-            width: 20px;
-            border-radius: 50%;
-            background: #2563eb;
-            cursor: pointer;
-            margin-top: -8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-            transition: transform 0.1s;
-        }
-        input[type=range]::-webkit-slider-thumb:hover {
-            transform: scale(1.2);
-        }
-        input[type=range]::-webkit-slider-runnable-track {
-            width: 100%;
-            height: 6px;
-            cursor: pointer;
-            background: #e2e8f0;
-            border-radius: 3px;
-        }
-    </style>
-</head>
-<body class="overflow-hidden bg-slate-100">
-
-    <!-- Map Container -->
-    <div id="map"></div>
-
-    <!-- Top Header -->
-    <div class="ui-overlay absolute top-4 left-4 right-4 md:right-auto md:w-96">
-        <div class="bg-white/90 backdrop-blur-md rounded-2xl shadow-lg p-5 border border-slate-200/50">
-            <div class="flex items-center gap-3 mb-2">
-                <div class="bg-blue-600 text-white p-2 rounded-lg">
-                    <i class="fa-solid fa-earth-asia text-xl"></i>
-                </div>
-                <div>
-                    <h1 class="text-lg font-bold text-slate-800 leading-tight">WebGIS Analisis Lahan</h1>
-                    <p class="text-xs text-slate-500 font-medium">Pemantauan Tutupan Lahan Interaktif</p>
-                </div>
-            </div>
-            <p class="text-sm text-slate-600 mt-3 border-t border-slate-100 pt-3">
-                Memvisualisasikan simulasi perubahan tutupan lahan (urbanisasi & deforestasi) dari waktu ke waktu.
-            </p>
-        </div>
-    </div>
-
-    <!-- Right Side Panel (Statistics & Legend) -->
-    <div class="ui-overlay absolute top-32 left-4 md:top-4 md:left-auto md:right-4 w-[calc(100%-2rem)] md:w-80 flex flex-col gap-4 max-h-[calc(100vh-12rem)] md:max-h-[calc(100vh-10rem)] overflow-y-auto">
+        <!-- Tailwind CSS -->
+        <script src="https://cdn.tailwindcss.com"></script>
         
-        <!-- Legend Panel -->
-        <div class="bg-white/90 backdrop-blur-md rounded-2xl shadow-lg p-5 border border-slate-200/50">
-            <h2 class="text-sm font-bold text-slate-800 mb-3 uppercase tracking-wider">Legenda Tutupan Lahan</h2>
-            <div class="flex flex-col gap-3" id="legend-container">
-                <!-- Injected via JS -->
-            </div>
-        </div>
+        <!-- Leaflet CSS -->
+        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+        
+        <!-- Font Awesome -->
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
-        <!-- Statistics Panel -->
-        <div class="bg-white/90 backdrop-blur-md rounded-2xl shadow-lg p-5 border border-slate-200/50">
-            <h2 class="text-sm font-bold text-slate-800 mb-3 uppercase tracking-wider flex justify-between">
-                <span>Statistik Area</span>
-                <span id="stat-year-label" class="text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">2000</span>
-            </h2>
-            <div class="flex flex-col gap-4" id="stats-container">
-                <!-- Injected via JS -->
-            </div>
-        </div>
-    </div>
+        <!-- Google Fonts -->
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
-    <!-- Bottom Timeline Controller -->
-    <div class="ui-overlay absolute bottom-6 left-4 right-4 md:left-1/2 md:-translate-x-1/2 md:w-[600px] max-w-full">
-        <div class="bg-white/90 backdrop-blur-md rounded-2xl shadow-xl p-4 md:p-6 border border-slate-200/50 flex flex-col md:flex-row items-center gap-4 md:gap-6">
+        <style>
+            body { font-family: 'Inter', sans-serif; }
             
-            <!-- Play/Pause Button -->
-            <button id="play-btn" class="w-12 h-12 flex-shrink-0 rounded-full bg-blue-600 text-white hover:bg-blue-700 transition-colors shadow-md flex items-center justify-center focus:outline-none focus:ring-4 focus:ring-blue-200">
-                <i class="fa-solid fa-play ml-1" id="play-icon"></i>
-            </button>
-            
-            <!-- Slider -->
-            <div class="flex-grow w-full">
-                <div class="flex justify-between text-xs font-semibold text-slate-500 mb-2 px-1">
-                    <span>2000</span>
-                    <span>2005</span>
-                    <span>2010</span>
-                    <span>2015</span>
-                    <span>2020</span>
-                    <span>2025</span>
-                </div>
-                <input type="range" id="year-slider" min="0" max="5" value="0" step="1">
-                <div class="text-center mt-2 font-bold text-lg text-slate-800" id="current-year-display">Tahun: 2000</div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Leaflet JS -->
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-    
-    <script>
-        // --- 1. CONFIGURATION & DATA CLASSES ---
-        const mapCenter = [-6.5950, 106.8166]; // Coordinates for Bogor, Indonesia
-        const availableYears = [2000, 2005, 2010, 2015, 2020, 2025];
-        
-        const landClasses = {
-            'hutan': { id: 1, name: 'Hutan / Vegetasi Lebat', color: '#166534', icon: 'fa-tree' },
-            'pertanian': { id: 2, name: 'Pertanian / Sawah', color: '#84cc16', icon: 'fa-leaf' },
-            'pemukiman': { id: 3, name: 'Pemukiman / Terbangun', color: '#ef4444', icon: 'fa-building' },
-            'air': { id: 4, name: 'Badan Air', color: '#3b82f6', icon: 'fa-water' }
-        };
-
-        // --- 2. INITIALIZE MAP ---
-        const map = L.map('map', {
-            zoomControl: false // Move zoom control to bottom right
-        }).setView(mapCenter, 13);
-
-        L.control.zoom({ position: 'bottomright' }).addTo(map);
-
-        // Add CartoDB Positron as a clean, light base map so our data stands out
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-            subdomains: 'abcd',
-            maxZoom: 20
-        }).addTo(map);
-
-        // --- 3. PROCEDURAL DATA GENERATION ---
-        // Since we don't have a real backend, we will simulate a grid of land cover polygons
-        // that changes states over the years.
-        
-        function generateSimulatedData(centerLat, centerLng, gridSize) {
-            const features = [];
-            const step = 0.003; // ~300 meters per grid cell
-            const startLat = centerLat - (gridSize * step) / 2;
-            const startLng = centerLng - (gridSize * step) / 2;
-
-            for (let i = 0; i < gridSize; i++) {
-                for (let j = 0; j < gridSize; j++) {
-                    const lat = startLat + (i * step);
-                    const lng = startLng + (j * step);
-                    
-                    // Define Polygon
-                    const bounds = [
-                        [lat, lng],
-                        [lat + step, lng],
-                        [lat + step, lng + step],
-                        [lat, lng + step]
-                    ];
-
-                    // Generate history for this specific cell
-                    let properties = { id: `${i}-${j}` };
-                    
-                    // Logic for generating realistic-looking simulated change
-                    // Determine initial state based on position (pseudo-random topography)
-                    let distToCenter = Math.sqrt(Math.pow(i - gridSize/2, 2) + Math.pow(j - gridSize/2, 2));
-                    
-                    let currentState = 'hutan'; // Default
-                    
-                    // Fixed Water Body (Simulate a river/lake passing through)
-                    if (Math.abs(i - j) < 2 || (i > gridSize-5 && j < 5)) {
-                        currentState = 'air';
-                    } 
-                    // Initial Urban core
-                    else if (distToCenter < 3) {
-                        currentState = 'pemukiman';
-                    }
-                    // Agriculture around urban core
-                    else if (distToCenter < 7) {
-                        currentState = (Math.random() > 0.3) ? 'pertanian' : 'hutan';
-                    }
-
-                    // Simulate year by year changes
-                    availableYears.forEach(year => {
-                        if (currentState !== 'air') {
-                            // Urban expansion logic
-                            if (currentState === 'pemukiman') {
-                                // stays urban
-                            } else if (currentState === 'pertanian') {
-                                // 20% chance to become urban per step
-                                if (Math.random() < 0.20 && year > 2000) currentState = 'pemukiman';
-                            } else if (currentState === 'hutan') {
-                                // 15% chance to become agriculture, 5% to become urban
-                                let rand = Math.random();
-                                if (rand < 0.05 && year > 2000) currentState = 'pemukiman';
-                                else if (rand < 0.20 && year > 2000) currentState = 'pertanian';
-                            }
-                        }
-                        // Format standar atribut GeoJSON dari QGIS/ArcGIS (contoh: properti 'tahun_2000')
-                        properties[`tahun_${year}`] = currentState; 
-                    });
-
-                    features.push({
-                        type: 'Feature',
-                        properties: properties,
-                        geometry: {
-                            type: 'Polygon',
-                            coordinates: [[[lng, lat], [lng + step, lat], [lng + step, lat + step], [lng, lat + step], [lng, lat]]]
-                        }
-                    });
-                }
-            }
-            return { type: "FeatureCollection", features: features };
-        }
-
-        // Variabel global untuk menyimpan data GeoJSON
-        let geojsonData = null; 
-        let geojsonLayer;
-        let currentDisplayedYear = 2000;
-
-        // --- 4. RENDER DATA ON MAP ---
-        function getStyle(feature) {
-            // Mengambil kelas tutupan lahan dari properti, misal: feature.properties.tahun_2000
-            const classKey = feature.properties[`tahun_${currentDisplayedYear}`];
-            
-            // Jika data kosong/tidak terdefinisi, beri warna default transparan
-            if (!classKey || !landClasses[classKey]) {
-                return { fillColor: '#000', weight: 0, opacity: 0, fillOpacity: 0 };
+            /* Map Container needs to take full height minus header if any, here we use absolute positioning */
+            #map {
+                position: absolute;
+                top: 0;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                z-index: 1; /* Map at bottom */
             }
 
-            const color = landClasses[classKey].color;
-            return {
-                fillColor: color,
-                weight: 0.5,
-                opacity: 1,
-                color: 'rgba(255,255,255,0.2)', // subtle border
-                fillOpacity: 0.7
+            /* UI Overlays need higher z-index */
+            .ui-overlay {
+                z-index: 1000;
+            }
+
+            /* Custom scrollbar for panels if they get too long */
+            ::-webkit-scrollbar { width: 6px; }
+            ::-webkit-scrollbar-track { background: transparent; }
+            ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+            ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+            /* Range Slider Styling */
+            input[type=range] {
+                -webkit-appearance: none;
+                width: 100%;
+                background: transparent;
+            }
+            input[type=range]::-webkit-slider-thumb {
+                -webkit-appearance: none;
+                height: 20px;
+                width: 20px;
+                border-radius: 50%;
+                background: #2563eb;
+                cursor: pointer;
+                margin-top: -8px;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+                transition: transform 0.1s;
+            }
+            input[type=range]::-webkit-slider-thumb:hover {
+                transform: scale(1.2);
+            }
+            input[type=range]::-webkit-slider-runnable-track {
+                width: 100%;
+                height: 6px;
+                cursor: pointer;
+                background: #e2e8f0;
+                border-radius: 3px;
+            }
+        </style>
+    </head>
+    <body class="overflow-hidden bg-slate-100">
+
+        <!-- Map Container -->
+        <div id="map"></div>
+
+        <!-- Top Header -->
+        <div class="ui-overlay absolute top-4 left-4 right-4 md:right-auto md:w-96">
+            <div class="bg-white/90 backdrop-blur-md rounded-2xl shadow-lg p-5 border border-slate-200/50">
+                <div class="flex items-center gap-3 mb-2">
+                    <div class="bg-blue-600 text-white p-2 rounded-lg">
+                        <i class="fa-solid fa-earth-asia text-xl"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-lg font-bold text-slate-800 leading-tight">WebGIS Analisis Lahan</h1>
+                        <p class="text-xs text-slate-500 font-medium">Pemantauan Tutupan Lahan Interaktif</p>
+                    </div>
+                </div>
+                <p class="text-sm text-slate-600 mt-3 border-t border-slate-100 pt-3">
+                    Memvisualisasikan simulasi perubahan tutupan lahan (urbanisasi & deforestasi) dari waktu ke waktu.
+                </p>
+            </div>
+        </div>
+
+        <!-- Right Side Panel (Statistics & Legend) -->
+        <div class="ui-overlay absolute top-32 left-4 md:top-4 md:left-auto md:right-4 w-[calc(100%-2rem)] md:w-80 flex flex-col gap-4 max-h-[calc(100vh-12rem)] md:max-h-[calc(100vh-10rem)] overflow-y-auto">
+            
+            <!-- Legend Panel -->
+            <div class="bg-white/90 backdrop-blur-md rounded-2xl shadow-lg p-5 border border-slate-200/50">
+                <h2 class="text-sm font-bold text-slate-800 mb-3 uppercase tracking-wider">Legenda Tutupan Lahan</h2>
+                <div class="flex flex-col gap-3" id="legend-container">
+                    <!-- Injected via JS -->
+                </div>
+            </div>
+
+            <!-- Statistics Panel -->
+            <div class="bg-white/90 backdrop-blur-md rounded-2xl shadow-lg p-5 border border-slate-200/50">
+                <h2 class="text-sm font-bold text-slate-800 mb-3 uppercase tracking-wider flex justify-between">
+                    <span>Statistik Area</span>
+                    <span id="stat-year-label" class="text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">2000</span>
+                </h2>
+                <div class="flex flex-col gap-4" id="stats-container">
+                    <!-- Injected via JS -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom Timeline Controller -->
+        <div class="ui-overlay absolute bottom-6 left-4 right-4 md:left-1/2 md:-translate-x-1/2 md:w-[600px] max-w-full">
+            <div class="bg-white/90 backdrop-blur-md rounded-2xl shadow-xl p-4 md:p-6 border border-slate-200/50 flex flex-col md:flex-row items-center gap-4 md:gap-6">
+                
+                <!-- Play/Pause Button -->
+                <button id="play-btn" class="w-12 h-12 flex-shrink-0 rounded-full bg-blue-600 text-white hover:bg-blue-700 transition-colors shadow-md flex items-center justify-center focus:outline-none focus:ring-4 focus:ring-blue-200">
+                    <i class="fa-solid fa-play ml-1" id="play-icon"></i>
+                </button>
+                
+                <!-- Slider -->
+                <div class="flex-grow w-full">
+                    <div class="flex justify-between text-xs font-semibold text-slate-500 mb-2 px-1">
+                        <span>2000</span>
+                        <span>2005</span>
+                        <span>2010</span>
+                        <span>2015</span>
+                        <span>2020</span>
+                        <span>2025</span>
+                    </div>
+                    <input type="range" id="year-slider" min="0" max="5" value="0" step="1">
+                    <div class="text-center mt-2 font-bold text-lg text-slate-800" id="current-year-display">Tahun: 2000</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Leaflet JS -->
+        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+        
+        <!-- Turf.js for Spatial Analysis -->
+        <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
+        
+        <script>
+            // --- 1. CONFIGURATION & DATA CLASSES ---
+            const mapCenter = [-0.81, 116.76]; // Koordinat disesuaikan ke area KIKN Nusantara
+            const availableYears = [2000, 2005, 2010, 2015, 2020, 2025];
+            
+            const landClasses = {
+                'hutan': { id: 1, name: 'Hutan / Vegetasi Lebat', color: '#166534', icon: 'fa-tree' },
+                'pertanian': { id: 2, name: 'Pertanian / Sawah', color: '#84cc16', icon: 'fa-leaf' },
+                'pemukiman': { id: 3, name: 'Pemukiman / Terbangun', color: '#ef4444', icon: 'fa-building' },
+                'air': { id: 4, name: 'Badan Air', color: '#3b82f6', icon: 'fa-water' }
             };
-        }
 
-        function highlightFeature(e) {
-            var layer = e.target;
-            layer.setStyle({
-                weight: 2,
-                color: '#fff',
-                fillOpacity: 0.9
-            });
-            layer.bringToFront();
-        }
+            // --- 2. INITIALIZE MAP ---
+            const map = L.map('map', {
+                zoomControl: false // Move zoom control to bottom right
+            }).setView(mapCenter, 13);
 
-        function resetHighlight(e) {
-            geojsonLayer.resetStyle(e.target);
-        }
+            L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-        function onEachFeature(feature, layer) {
-            layer.on({
-                mouseover: function(e) {
-                    highlightFeature(e);
-                    // Update a tooltip or custom UI element if desired
-                    const currentClass = feature.properties[`tahun_${currentDisplayedYear}`];
-                    
-                    if(currentClass && landClasses[currentClass]) {
-                         layer.bindTooltip(`<b>${landClasses[currentClass].name}</b><br>Tahun: ${currentDisplayedYear}`).openTooltip();
-                    }
-                },
-                mouseout: function(e) {
-                    resetHighlight(e);
-                    layer.closeTooltip();
-                }
-            });
-        }
-
-        function updateMapAndUI(year) {
-            if (!geojsonData) return; // Tunggu data dimuat
-            currentDisplayedYear = year;
-            
-            // 1. Update Map Styles
-            if(geojsonLayer) { map.removeLayer(geojsonLayer); }
-            
-            geojsonLayer = L.geoJSON(geojsonData, {
-                style: getStyle,
-                onEachFeature: onEachFeature
+            // Add CartoDB Positron as a clean, light base map so our data stands out
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+                subdomains: 'abcd',
+                maxZoom: 20
             }).addTo(map);
 
-            // 2. Update Statistics
-            updateStatistics(year);
+            // --- 3. PROCEDURAL DATA GENERATION (BERDASARKAN BATAS WILAYAH) ---
+            // Menggunakan Turf.js untuk membuat grid kecil di dalam poligon batas KIKN,
+            // kemudian memberikan simulasi tutupan lahan pada grid-grid tersebut.
             
-            // 3. Update UI Labels
-            document.getElementById('current-year-display').textContent = `Tahun: ${year}`;
-            document.getElementById('stat-year-label').textContent = year;
-        }
-
-        // --- 5. UI COMPONENTS & LOGIC ---
-
-        function buildLegend() {
-            const container = document.getElementById('legend-container');
-            Object.keys(landClasses).forEach(key => {
-                const cls = landClasses[key];
-                container.innerHTML += `
-                    <div class="flex items-center gap-3">
-                        <div class="w-6 h-6 rounded border border-black/10 flex items-center justify-center text-white text-xs" style="background-color: ${cls.color}">
-                            <i class="fa-solid ${cls.icon}"></i>
-                        </div>
-                        <span class="text-sm font-medium text-slate-700">${cls.name}</span>
-                    </div>
-                `;
-            });
-        }
-
-        function updateStatistics(year) {
-            const container = document.getElementById('stats-container');
-            container.innerHTML = '';
-            
-            // Calculate totals
-            const counts = { 'hutan': 0, 'pertanian': 0, 'pemukiman': 0, 'air': 0 };
-            let total = 0;
-
-            geojsonData.features.forEach(f => {
-                const classKey = f.properties[`tahun_${year}`];
-                if (counts[classKey] !== undefined) {
-                    counts[classKey]++;
-                    total++;
-                }
-            });
-
-            // Render bars
-            Object.keys(landClasses).forEach(key => {
-                const cls = landClasses[key];
-                const count = counts[key];
-                const percentage = ((count / total) * 100).toFixed(1);
+            function generateSimulatedDataInsideBoundary(boundaryGeoJSON) {
+                // 1. Buat Bounding Box dari batas wilayah KIKN
+                const bbox = turf.bbox(boundaryGeoJSON);
                 
-                container.innerHTML += `
-                    <div>
-                        <div class="flex justify-between text-xs font-semibold mb-1">
-                            <span class="text-slate-700">${cls.name}</span>
-                            <span class="text-slate-500">${percentage}%</span>
-                        </div>
-                        <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden border border-slate-200">
-                            <div class="h-2 rounded-full transition-all duration-500 ease-out" style="width: ${percentage}%; background-color: ${cls.color}"></div>
-                        </div>
-                    </div>
-                `;
-            });
-        }
-
-        // Timeline Slider Logic
-        const slider = document.getElementById('year-slider');
-        slider.addEventListener('input', (e) => {
-            const index = parseInt(e.target.value);
-            updateMapAndUI(availableYears[index]);
-        });
-
-        // Play/Pause Animation Logic
-        const playBtn = document.getElementById('play-btn');
-        const playIcon = document.getElementById('play-icon');
-        let playInterval;
-        let isPlaying = false;
-
-        playBtn.addEventListener('click', () => {
-            if (isPlaying) {
-                // Pause
-                clearInterval(playInterval);
-                playIcon.classList.remove('fa-pause');
-                playIcon.classList.add('fa-play');
-                playBtn.classList.remove('bg-red-500', 'hover:bg-red-600');
-                playBtn.classList.add('bg-blue-600', 'hover:bg-blue-700');
-            } else {
-                // Play
-                playIcon.classList.remove('fa-play');
-                playIcon.classList.add('fa-pause');
-                playBtn.classList.remove('bg-blue-600', 'hover:bg-blue-700');
-                playBtn.classList.add('bg-red-500', 'hover:bg-red-600');
+                // 2. Buat grid kotak (ukuran 0.4 km per kotak) menutupi bbox
+                const cellSide = 0.4; 
+                const grid = turf.squareGrid(bbox, cellSide, {units: 'kilometers'});
                 
-                // If at the end, restart
-                if (parseInt(slider.value) === availableYears.length - 1) {
-                    slider.value = 0;
-                    updateMapAndUI(availableYears[0]);
-                }
+                const features = [];
+                const boundaryFeature = boundaryGeoJSON.features[0]; 
+                const centerPoint = turf.center(boundaryGeoJSON);
 
-                playInterval = setInterval(() => {
-                    let currentIndex = parseInt(slider.value);
-                    if (currentIndex < availableYears.length - 1) {
-                        currentIndex++;
-                        slider.value = currentIndex;
-                        updateMapAndUI(availableYears[currentIndex]);
-                    } else {
-                        clearInterval(playInterval);
-                        isPlaying = false;
-                        playIcon.classList.remove('fa-pause');
-                        playIcon.classList.add('fa-play');
-                        playBtn.classList.remove('bg-red-500', 'hover:bg-red-600');
-                        playBtn.classList.add('bg-blue-600', 'hover:bg-blue-700');
+                turf.featureEach(grid, function (currentFeature, featureIndex) {
+                    // 3. Filter: Hanya ambil kotak yang berada di dalam / memotong batas wilayah
+                    if (turf.booleanIntersects(currentFeature, boundaryFeature)) {
+                        
+                        // Hitung jarak ke pusat IKN untuk simulasi pola
+                        const distanceToCenter = turf.distance(centerPoint, turf.centroid(currentFeature), {units: 'kilometers'});
+                        
+                        let properties = { id: `grid-${featureIndex}` };
+                        
+                        // -- LOGIKA AWAL (TAHUN 2000) --
+                        let currentState = 'hutan'; // Mayoritas masih hutan
+                        if (distanceToCenter < 1.0) currentState = 'pertanian'; // Ada sedikit area garapan eksisting
+                        if (Math.random() > 0.95) currentState = 'air'; // Simulasi badan air
+
+                        // -- SIMULASI PERUBAHAN (Urbanisasi KIKN) --
+                        availableYears.forEach(year => {
+                            if (currentState !== 'air') {
+                                if (currentState === 'pemukiman') {
+                                    // Tetap pemukiman
+                                } else if (currentState === 'pertanian') {
+                                    if (year >= 2020 && Math.random() < 0.40) currentState = 'pemukiman';
+                                } else if (currentState === 'hutan') {
+                                    let rand = Math.random();
+                                    // Pembangunan IKN masif pasca 2020 (diutamakan dekat pusat)
+                                    if (year >= 2020 && distanceToCenter < 3.5) {
+                                        if (rand < 0.25) currentState = 'pemukiman'; // Infrastruktur terbangun
+                                        else if (rand < 0.15) currentState = 'pertanian'; // Pembukaan lahan / land clearing
+                                    } else if (year > 2000 && year < 2020) {
+                                        if (rand < 0.03) currentState = 'pertanian'; // Deforestasi perlahan
+                                    }
+                                }
+                            }
+                            // Set property misal: 'tahun_2000': 'hutan'
+                            properties[`tahun_${year}`] = currentState; 
+                        });
+
+                        currentFeature.properties = properties;
+                        features.push(currentFeature);
                     }
-                }, 1200); // 1.2 seconds per year transition
-            }
-            isPlaying = !isPlaying;
-        });
+                });
 
-        // --- 6. FUNGSI PEMUATAN DATA ASLI (FETCH API) ---
-        async function muatDataAsli() {
-            try {
-                // Mencoba mengambil data GeoJSON asli. 
-                // Ganti 'data_asli.geojson' dengan path/URL data Anda nantinya.
-                const response = await fetch('data_asli.geojson'); 
+                return turf.featureCollection(features);
+            }
+
+            // Variabel global untuk menyimpan data GeoJSON
+            let geojsonData = null; 
+            let geojsonLayer;
+            let currentDisplayedYear = 2000;
+
+            // --- 4. RENDER DATA ON MAP ---
+            function getStyle(feature) {
+                // Mengambil kelas tutupan lahan dari properti, misal: feature.properties.tahun_2000
+                const classKey = feature.properties[`tahun_${currentDisplayedYear}`];
                 
-                if (!response.ok) {
-                    throw new Error("File data_asli.geojson tidak ditemukan. Menggunakan data simulasi.");
+                // Jika data kosong/tidak terdefinisi, beri warna default transparan
+                if (!classKey || !landClasses[classKey]) {
+                    return { fillColor: '#000', weight: 0, opacity: 0, fillOpacity: 0 };
                 }
-                
-                // Jika file ditemukan, parse sebagai JSON
-                geojsonData = await response.json();
-                console.log("Data asli berhasil dimuat!");
-                
-            } catch (error) {
-                console.warn(error.message);
-                // FALLBACK: Jika file tidak ada, gunakan data simulasi
-                geojsonData = generateSimulatedData(mapCenter[0], mapCenter[1], 25);
+
+                const color = landClasses[classKey].color;
+                return {
+                    fillColor: color,
+                    weight: 0.5,
+                    opacity: 1,
+                    color: 'rgba(255,255,255,0.2)', // subtle border
+                    fillOpacity: 0.7
+                };
             }
 
-            // Setelah data (asli/simulasi) tersedia, bangun legenda dan update UI
-            buildLegend();
-            updateMapAndUI(2000); // Load initial state
-        }
+            function highlightFeature(e) {
+                var layer = e.target;
+                layer.setStyle({
+                    weight: 2,
+                    color: '#fff',
+                    fillOpacity: 0.9
+                });
+                layer.bringToFront();
+            }
 
-        // --- 7. INITIALIZATION ---
-        // Panggil fungsi utama saat website dibuka
-        muatDataAsli(); 
+            function resetHighlight(e) {
+                geojsonLayer.resetStyle(e.target);
+            }
 
-    </script>
-</body>
-</html>
+            function onEachFeature(feature, layer) {
+                layer.on({
+                    mouseover: function(e) {
+                        highlightFeature(e);
+                        // Update a tooltip or custom UI element if desired
+                        const currentClass = feature.properties[`tahun_${currentDisplayedYear}`];
+                        
+                        if(currentClass && landClasses[currentClass]) {
+                            layer.bindTooltip(`<b>${landClasses[currentClass].name}</b><br>Tahun: ${currentDisplayedYear}`).openTooltip();
+                        }
+                    },
+                    mouseout: function(e) {
+                        resetHighlight(e);
+                        layer.closeTooltip();
+                    }
+                });
+            }
+
+            function updateMapAndUI(year) {
+                if (!geojsonData) return; // Tunggu data dimuat
+                currentDisplayedYear = year;
+                
+                // 1. Update Map Styles
+                if(geojsonLayer) { map.removeLayer(geojsonLayer); }
+                
+                geojsonLayer = L.geoJSON(geojsonData, {
+                    style: getStyle,
+                    onEachFeature: onEachFeature
+                }).addTo(map);
+
+                // 2. Update Statistics
+                updateStatistics(year);
+                
+                // 3. Update UI Labels
+                document.getElementById('current-year-display').textContent = `Tahun: ${year}`;
+                document.getElementById('stat-year-label').textContent = year;
+            }
+
+            // --- 5. UI COMPONENTS & LOGIC ---
+
+            function buildLegend() {
+                const container = document.getElementById('legend-container');
+                Object.keys(landClasses).forEach(key => {
+                    const cls = landClasses[key];
+                    container.innerHTML += `
+                        <div class="flex items-center gap-3">
+                            <div class="w-6 h-6 rounded border border-black/10 flex items-center justify-center text-white text-xs" style="background-color: ${cls.color}">
+                                <i class="fa-solid ${cls.icon}"></i>
+                            </div>
+                            <span class="text-sm font-medium text-slate-700">${cls.name}</span>
+                        </div>
+                    `;
+                });
+            }
+
+            function updateStatistics(year) {
+                const container = document.getElementById('stats-container');
+                container.innerHTML = '';
+                
+                // Calculate totals
+                const counts = { 'hutan': 0, 'pertanian': 0, 'pemukiman': 0, 'air': 0 };
+                let total = 0;
+
+                geojsonData.features.forEach(f => {
+                    const classKey = f.properties[`tahun_${year}`];
+                    if (counts[classKey] !== undefined) {
+                        counts[classKey]++;
+                        total++;
+                    }
+                });
+
+                // Render bars
+                Object.keys(landClasses).forEach(key => {
+                    const cls = landClasses[key];
+                    const count = counts[key];
+                    const percentage = ((count / total) * 100).toFixed(1);
+                    
+                    container.innerHTML += `
+                        <div>
+                            <div class="flex justify-between text-xs font-semibold mb-1">
+                                <span class="text-slate-700">${cls.name}</span>
+                                <span class="text-slate-500">${percentage}%</span>
+                            </div>
+                            <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden border border-slate-200">
+                                <div class="h-2 rounded-full transition-all duration-500 ease-out" style="width: ${percentage}%; background-color: ${cls.color}"></div>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+
+            // Timeline Slider Logic
+            const slider = document.getElementById('year-slider');
+            slider.addEventListener('input', (e) => {
+                const index = parseInt(e.target.value);
+                updateMapAndUI(availableYears[index]);
+            });
+
+            // Play/Pause Animation Logic
+            const playBtn = document.getElementById('play-btn');
+            const playIcon = document.getElementById('play-icon');
+            let playInterval;
+            let isPlaying = false;
+
+            playBtn.addEventListener('click', () => {
+                if (isPlaying) {
+                    // Pause
+                    clearInterval(playInterval);
+                    playIcon.classList.remove('fa-pause');
+                    playIcon.classList.add('fa-play');
+                    playBtn.classList.remove('bg-red-500', 'hover:bg-red-600');
+                    playBtn.classList.add('bg-blue-600', 'hover:bg-blue-700');
+                } else {
+                    // Play
+                    playIcon.classList.remove('fa-play');
+                    playIcon.classList.add('fa-pause');
+                    playBtn.classList.remove('bg-blue-600', 'hover:bg-blue-700');
+                    playBtn.classList.add('bg-red-500', 'hover:bg-red-600');
+                    
+                    // If at the end, restart
+                    if (parseInt(slider.value) === availableYears.length - 1) {
+                        slider.value = 0;
+                        updateMapAndUI(availableYears[0]);
+                    }
+
+                    playInterval = setInterval(() => {
+                        let currentIndex = parseInt(slider.value);
+                        if (currentIndex < availableYears.length - 1) {
+                            currentIndex++;
+                            slider.value = currentIndex;
+                            updateMapAndUI(availableYears[currentIndex]);
+                        } else {
+                            clearInterval(playInterval);
+                            isPlaying = false;
+                            playIcon.classList.remove('fa-pause');
+                            playIcon.classList.add('fa-play');
+                            playBtn.classList.remove('bg-red-500', 'hover:bg-red-600');
+                            playBtn.classList.add('bg-blue-600', 'hover:bg-blue-700');
+                        }
+                    }, 1200); // 1.2 seconds per year transition
+                }
+                isPlaying = !isPlaying;
+            });
+
+            // --- 6. FUNGSI PEMUATAN DATA ASLI ---
+            function muatDataAsli() {
+                // Karena teks GeoJSON Anda di chat terpotong karena terlalu panjang,
+                // kami menyediakan variabel ini.
+                
+                // GANTI FITUR INI DENGAN FILE GEOJSON FULL ANDA
+                const batasKIKN = {
+                    "type": "FeatureCollection",
+                    "features": [
+                        {
+                            "type": "Feature",
+                            "id": 1,
+                            "geometry": {
+                                "type": "Polygon",
+                                "coordinates": [
+                                    [
+                                        // ---> PASTE KOORDINAT LENGKAP KIKN ANDA DI SINI <---
+                                        // Ini adalah contoh kotak sementara jika Anda belum mem-paste data asli
+                                        [116.70, -0.85],
+                                        [116.80, -0.85],
+                                        [116.80, -0.75],
+                                        [116.70, -0.75],
+                                        [116.70, -0.85]
+                                    ]
+                                ]
+                            }
+                        }
+                    ]
+                };
+
+                try {
+                    // Hasilkan grid tutupan lahan menggunakan batas GeoJSON
+                    geojsonData = generateSimulatedDataInsideBoundary(batasKIKN);
+                    
+                    // Arahkan kamera peta agar pas tepat di batas KIKN secara otomatis!
+                    const bbox = turf.bbox(batasKIKN);
+                    map.fitBounds([[bbox[1], bbox[0]], [bbox[3], bbox[2]]], { padding: [20, 20] });
+                } catch (error) {
+                    console.error("Gagal memproses data GeoJSON.", error);
+                }
+
+                // Setelah data tersedia, bangun legenda dan update UI
+                buildLegend();
+                updateMapAndUI(2000); // Load initial state
+            }
+
+            // --- 7. INITIALIZATION ---
+            // Panggil fungsi utama saat website dibuka
+            muatDataAsli(); 
+
+        </script>
+    </body>
+    </html>
