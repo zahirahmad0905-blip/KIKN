@@ -71,16 +71,64 @@
         // Pindahkan tombol zoom ke kanan bawah
         L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-        // 2. Tambahkan Basemap Citra Satelit (Esri World Imagery)
-        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-            attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
-            maxZoom: 19
-        }).addTo(map);
+        // 2. Tambahkan Skala Peta (Kiri Bawah)
+        L.control.scale({ metric: true, imperial: false, position: 'bottomleft' }).addTo(map);
 
-        // 3. Fungsi untuk mengambil dan memuat data GeoJSON batas KIKN
+        // 3. Definisikan Beberapa Pilihan Basemap
+        const satelitEsri = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'Tiles &copy; Esri',
+            maxNativeZoom: 17, // SOLUSI ZOOM: Batas gambar server, sisanya akan di-stretch
+            maxZoom: 19
+        });
+
+        const petaJalan = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors',
+            maxZoom: 19
+        });
+
+        // Tampilkan satelit sebagai default
+        satelitEsri.addTo(map);
+
+        // 4. Siapkan Layer Group untuk Kontrol (Agar bisa dimatikan/dinyalakan)
+        const layerBatasKIKN = L.layerGroup().addTo(map);
+        const layerTitikPenting = L.layerGroup().addTo(map);
+
+        // 5. Tambahkan Titik Lokasi Penting (Markers)
+        // Icon Merah untuk Titik Nol
+        const iconMerah = L.icon({
+            iconUrl: 'https://cdn.rawgit.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+            shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+            iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
+        });
+        L.marker([-0.9729, 116.7088], {icon: iconMerah})
+            .bindPopup("<div style='text-align:center;'><b>Titik Nol Nusantara</b><br>Referensi awal pembangunan IKN.</div>")
+            .addTo(layerTitikPenting);
+
+        // Icon Biru untuk Istana
+        const iconBiru = L.icon({
+            iconUrl: 'https://cdn.rawgit.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
+            shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+            iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
+        });
+        L.marker([-0.9654, 116.7135], {icon: iconBiru})
+            .bindPopup("<div style='text-align:center;'><b>Kawasan Istana Negara</b><br>Kawasan Inti Pusat Pemerintahan.</div>")
+            .addTo(layerTitikPenting);
+
+        // 6. Tambahkan Kontrol Layer ke Kanan Atas
+        const baseMaps = {
+            "Citra Satelit": satelitEsri,
+            "Peta Jalan": petaJalan
+        };
+        const overlayMaps = {
+            "Batas Wilayah": layerBatasKIKN,
+            "Titik Penting": layerTitikPenting
+        };
+        L.control.layers(baseMaps, overlayMaps, { position: 'topright' }).addTo(map);
+
+        // 7. Fungsi untuk mengambil dan memuat data GeoJSON batas KIKN
         async function muatBatasKIKN() {
             try {
-                // Link raw GeoJSON dari repository GitHub Anda
+                // Link raw GeoJSON dari repository GitHub
                 const githubRawUrl = 'https://raw.githubusercontent.com/zahirahmad0905-blip/KIKN/main/KIKN.geojson.geojson';
                 const response = await fetch(githubRawUrl);
                 
@@ -90,43 +138,37 @@
                 
                 const dataGeoJSON = await response.json();
 
-                // 4. Tambahkan layer GeoJSON ke peta
-                const batasLayer = L.geoJSON(dataGeoJSON, {
+                // Tambahkan layer GeoJSON ke dalam layer group "layerBatasKIKN"
+                const batasPolygon = L.geoJSON(dataGeoJSON, {
                     style: function (feature) {
                         return {
                             color: '#fbbf24', // Warna garis batas (Kuning)
-                            weight: 3,        // Ketebalan garis
-                            opacity: 1,       // Opasitas garis (1 = solid)
-                            fillColor: '#fef08a', // Warna area di dalam
-                            fillOpacity: 0.15 // Opasitas area dalam (transparan agar citra satelit tetap terlihat)
+                            weight: 3,
+                            opacity: 1,
+                            fillColor: '#fef08a',
+                            fillOpacity: 0.15 
                         };
                     },
                     onEachFeature: function (feature, layer) {
-                        // Tambahkan interaksi jika kursor diarahkan ke area
                         layer.on({
                             mouseover: function(e) {
-                                e.target.setStyle({
-                                    weight: 5,
-                                    fillOpacity: 0.3
-                                });
+                                e.target.setStyle({ weight: 5, fillOpacity: 0.3 });
                             },
                             mouseout: function(e) {
-                                batasLayer.resetStyle(e.target);
+                                batasPolygon.resetStyle(e.target);
                             }
                         });
-                        
-                        // Menambahkan tooltip sederhana
                         layer.bindTooltip("<b>Area KIKN</b>", {sticky: true});
                     }
-                }).addTo(map);
+                }).addTo(layerBatasKIKN);
 
-                // 5. Arahkan kamera/zoom peta agar pas dengan batas area KIKN
-                map.fitBounds(batasLayer.getBounds(), { padding: [30, 30] });
+                // Arahkan kamera/zoom peta agar pas dengan batas area KIKN
+                map.fitBounds(batasPolygon.getBounds(), { padding: [30, 30] });
                 
             } catch (error) {
                 console.error("Gagal memproses data GeoJSON.", error);
                 
-                // Tampilkan pesan error jika gagal memuat (misal karena jaringan)
+                // Tampilkan pesan error jika gagal memuat
                 const mapDiv = document.getElementById('map');
                 mapDiv.innerHTML += `
                     <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 ui-overlay bg-white p-6 rounded-xl shadow-xl text-center">
