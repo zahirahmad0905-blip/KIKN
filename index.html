@@ -417,49 +417,41 @@
             });
 
             // --- 6. FUNGSI PEMUATAN DATA ASLI ---
-            function muatDataAsli() {
-                // Karena teks GeoJSON Anda di chat terpotong karena terlalu panjang,
-                // kami menyediakan variabel ini.
-                
-                // GANTI FITUR INI DENGAN FILE GEOJSON FULL ANDA
-                const batasKIKN = {
-                    "type": "FeatureCollection",
-                    "features": [
-                        {
-                            "type": "Feature",
-                            "id": 1,
-                            "geometry": {
-                                "type": "Polygon",
-                                "coordinates": [
-                                    [
-                                        // ---> PASTE KOORDINAT LENGKAP KIKN ANDA DI SINI <---
-                                        // Ini adalah contoh kotak sementara jika Anda belum mem-paste data asli
-                                        [116.70, -0.85],
-                                        [116.80, -0.85],
-                                        [116.80, -0.75],
-                                        [116.70, -0.75],
-                                        [116.70, -0.85]
-                                    ]
-                                ]
-                            }
-                        }
-                    ]
-                };
-
+            async function muatDataAsli() {
                 try {
+                    // Mengambil file GeoJSON langsung dari repository GitHub Anda!
+                    const githubRawUrl = 'https://raw.githubusercontent.com/zahirahmad0905-blip/KIKN/main/KIKN.geojson.geojson';
+                    const response = await fetch(githubRawUrl);
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    
+                    const batasKIKN = await response.json();
+
                     // Hasilkan grid tutupan lahan menggunakan batas GeoJSON
                     geojsonData = generateSimulatedDataInsideBoundary(batasKIKN);
                     
-                    // Arahkan kamera peta agar pas tepat di batas KIKN secara otomatis!
+                    // Arahkan kamera peta agar pas tepat di batas KIKN secara otomatis
                     const bbox = turf.bbox(batasKIKN);
                     map.fitBounds([[bbox[1], bbox[0]], [bbox[3], bbox[2]]], { padding: [20, 20] });
+                    
+                    // Setelah data tersedia, bangun legenda dan update UI
+                    buildLegend();
+                    updateMapAndUI(2000); // Load initial state
+                    
                 } catch (error) {
                     console.error("Gagal memproses data GeoJSON.", error);
+                    // Tampilkan pesan error di layar jika gagal memuat
+                    const mapDiv = document.getElementById('map');
+                    mapDiv.innerHTML = `<div class="flex items-center justify-center h-full w-full bg-slate-100 text-slate-800 text-center p-4">
+                        <div>
+                            <i class="fa-solid fa-triangle-exclamation text-4xl text-red-500 mb-4"></i>
+                            <h2 class="text-xl font-bold">Gagal memuat data GeoJSON</h2>
+                            <p class="mt-2 text-sm text-slate-600">Pastikan file terunggah di GitHub dengan nama yang sesuai.</p>
+                        </div>
+                    </div>`;
                 }
-
-                // Setelah data tersedia, bangun legenda dan update UI
-                buildLegend();
-                updateMapAndUI(2000); // Load initial state
             }
 
             // --- 7. INITIALIZATION ---
